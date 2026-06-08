@@ -1,0 +1,189 @@
+{
+  "providers": [
+    {
+      "name": "anthropic",
+      "datacenter_location": "USA",
+      "datacenter_pue": {
+        "type": "range",
+        "min": 1.09,
+        "max": 1.14
+      },
+      "datacenter_wue": {
+        "type": "range",
+        "min": 0.13,
+        "max": 0.999
+      },
+      "compute_capacity": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 1.4,
+        "2026": null
+      },
+      "number_of_active_models": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 6,
+        "2026": null
+      }
+
+    },
+    {
+      "name": "cohere",
+      "datacenter_location": "USA",
+      "datacenter_pue": {
+        "type": "scalar",
+        "value": 1.09
+      },
+      "datacenter_wue": {
+        "type": "scalar",
+        "value": 0.999
+      },
+      "compute_capacity": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 1.9,
+        "2026": null
+      },
+      "number_of_active_models": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 10,
+        "2026": null
+      }
+    },
+    {
+      "name": "google_genai",
+      "datacenter_location": "USA",
+      "datacenter_pue": {
+        "type": "scalar",
+        "value": 1.09
+      },
+      "datacenter_wue": {
+        "type": "scalar",
+        "value": 0.999
+      },
+      "compute_capacity": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 3.0,
+        "2026": null
+      },
+      "number_of_active_models": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 4,
+        "2026": null
+      }
+    },
+    {
+      "name": "huggingface_hub",
+      "datacenter_location": "USA",
+      "datacenter_pue": {
+        "type": "range",
+        "min": 1.09,
+        "max": 1.14
+      },
+      "datacenter_wue": {
+        "type": "range",
+        "min": 0.13,
+        "max": 0.99
+      },
+      "compute_capacity": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 1.9,
+        "2026": null
+      },
+      "number_of_active_models": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 10,
+        "2026": null
+      }
+    },
+    {
+      "name": "mistralai",
+      "datacenter_location": "SWE",
+      "datacenter_pue": {
+        "type": "scalar",
+        "value": 1.16
+      },
+      "datacenter_wue": {
+        "type": "scalar",
+        "value": 0.09
+      },
+      "compute_capacity": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 2.0,
+        "2026": null
+      },
+      "number_of_active_models": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 6,
+        "2026": null
+      }
+    },
+    {
+      "name": "openai",
+      "datacenter_location": "USA",
+      "datacenter_pue": {
+        "type": "scalar",
+        "value": 1.20
+      },
+      "datacenter_wue": {
+        "type": "scalar",
+        "value": 0.569
+      },
+      "compute_capacity": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 1.9,
+        "2026": null
+      },
+      "number_of_active_models": {
+        "2020": null,
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": 14,
+        "2026": null
+      }
+    }
+  ]
+}
