@@ -7,6 +7,7 @@ from impacts.constants import (
     GPU_EMBODIED_IMPACT_ADPE,
     GPU_EMBODIED_IMPACT_GWP,
     GPU_EMBODIED_IMPACT_PE,
+    GPU_EMBODIED_IMPACT_WCF,
     GPU_ENERGY_ALPHA,
     GPU_ENERGY_BETA,
     GPU_ENERGY_GAMMA,
@@ -19,8 +20,15 @@ from impacts.constants import (
     SERVER_EMBODIED_IMPACT_ADPE,
     SERVER_EMBODIED_IMPACT_GWP,
     SERVER_EMBODIED_IMPACT_PE,
+    SERVER_EMBODIED_IMPACT_WCF,
     SERVER_GPUS,
     SERVER_POWER,
+    NETWORK_POWER,
+    NETWORK_EMBODIED_IMPACT_GWP,
+    NETWORK_EMBODIED_IMPACT_ADPE,
+    NETWORK_EMBODIED_IMPACT_PE,
+    NETWORK_EMBODIED_IMPACT_WCF,
+    NETWORK_LIFESPAN,
 )
 from impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from range_value import RangeValue, ValueOrRange
@@ -160,11 +168,36 @@ def server_energy(
 
 
 @dag.asset
+def network_energy(
+        generation_latency: float,
+        network_power: float,
+        server_gpu_count: int,
+        gpu_required_count: int,
+        batch_size: int
+) -> float:
+    """
+    Compute the energy consumption of the network equipment.
+
+    Args:
+        generation_latency: Token generation latency in seconds.
+        network_power: Power consumption of the network equipment in kW.
+        server_gpu_count: Number of available GPUs in the server.
+        gpu_required_count: Number of required GPUs to load the model.
+        batch_size: Number of requests handled concurrently by the server.
+
+    Returns:
+        The energy consumption of the network equipment in kWh.
+    """
+    return (generation_latency / 3600) * network_power * (gpu_required_count / server_gpu_count) * (1 / batch_size)
+
+
+@dag.asset
 def request_energy(
         datacenter_pue: float,
         server_energy: float,
         gpu_required_count: int,
-        gpu_energy: ValueOrRange
+        gpu_energy: ValueOrRange,
+        network_energy: float
 ) -> ValueOrRange:
     """
     Compute the energy consumption of the request.
@@ -174,11 +207,12 @@ def request_energy(
         server_energy: Energy consumption of the server in kWh.
         gpu_required_count: Number of required GPUs to load the model.
         gpu_energy: Energy consumption of a single GPU in kWh.
+        network_energy: Energy consumption of the network equipment in kWh.
 
     Returns:
         The energy consumption of the request in kWh.
     """
-    return datacenter_pue * (server_energy + gpu_required_count * gpu_energy)
+    return datacenter_pue * (server_energy + gpu_required_count * gpu_energy + network_energy)
 
 
 @dag.asset
@@ -254,6 +288,7 @@ def request_usage_wcf(
         The water usage impact of the request in liters.
     """
     return request_energy * (datacenter_wue + datacenter_pue * if_electricity_mix_wue)
+# TODO: problem - should use request_energy or server_energy here? With request_energy, PUE is counted twice.
 
 
 @dag.asset
@@ -323,11 +358,115 @@ def server_gpu_embodied_pe(
 
 
 @dag.asset
+def server_gpu_embodied_wcf(
+        server_embodied_wcf: float,
+        server_gpu_count: float,
+        gpu_embodied_wcf: float,
+        gpu_required_count: int
+) -> float:
+    """
+    Compute the Water Consumption Footprint (WCF) embodied impact of the server
+
+    Args:
+        server_embodied_wcf: WCF embodied impact of the server in L.
+        server_gpu_count: Number of available GPUs in the server.
+        gpu_embodied_wcf: WCF embodied impact of a single GPU in L.
+        gpu_required_count: Number of required GPUs to load the model.
+
+    Returns:
+        The WCF embodied impact of the server and the GPUs in L.
+    """
+    return (gpu_required_count / server_gpu_count) * server_embodied_wcf + gpu_required_count * gpu_embodied_wcf
+
+
+@dag.asset
+def network_only_embodied_gwp(
+        network_embodied_gwp: float,
+        server_gpu_count: float,
+        gpu_required_count: int
+) -> float:
+    """
+    Compute the Global Warming Potential (GWP) embodied impact of the network equipment.
+
+    Args:
+        network_embodied_gwp: GWP embodied impact of the network equipment in kgCO2eq.
+        server_gpu_count: Number of available GPUs in the server.
+        gpu_required_count: Number of required GPUs to load the model.
+
+    Returns:
+        The GWP embodied impact of the network equipment in kgCO2eq.
+    """
+    return (gpu_required_count / server_gpu_count) * network_embodied_gwp
+
+
+@dag.asset
+def network_only_embodied_adpe(
+        network_embodied_adpe: float,
+        server_gpu_count: float,
+        gpu_required_count: int
+) -> float:
+    """
+    Compute the Abiotic Depletion Potential for Elements (ADPe) embodied impact of the network equipment.
+
+    Args:
+        network_embodied_adpe: ADPe embodied impact of the network equipment in kgSbeq.
+        server_gpu_count: Number of available GPUs in the server.
+        gpu_required_count: Number of required GPUs to load the model.
+
+    Returns:
+        The ADPe embodied impact of the network equipment in kgSbeq.
+    """
+    return (gpu_required_count / server_gpu_count) * network_embodied_adpe
+
+
+@dag.asset
+def network_only_embodied_pe(
+        network_embodied_pe: float,
+        server_gpu_count: float,
+        gpu_required_count: int
+) -> float:
+    """
+    Compute the Primary Energy (PE) embodied impact of the network equipment.
+
+    Args:
+        network_embodied_pe: PE embodied impact of the network equipment in MJ.
+        server_gpu_count: Number of available GPUs in the server.
+        gpu_required_count: Number of required GPUs to load the model.
+
+    Returns:
+        The PE embodied impact of the network equipment in MJ.
+    """
+    return (gpu_required_count / server_gpu_count) * network_embodied_pe
+
+
+@dag.asset
+def network_only_embodied_wcf(
+        network_embodied_wcf: float,
+        server_gpu_count: float,
+        gpu_required_count: int
+) -> float:
+    """
+    Compute the Water Consumption Footprint (WCF) embodied impact of the network equipment.
+
+    Args:
+        network_embodied_wcf: WCF embodied impact of the network equipment in L.
+        server_gpu_count: Number of available GPUs in the server.
+        gpu_required_count: Number of required GPUs to load the model.
+
+    Returns:
+        The WCF embodied impact of the network equipment in L.
+    """
+    return (gpu_required_count / server_gpu_count) * network_embodied_wcf
+
+
+@dag.asset
 def request_embodied_gwp(
         server_gpu_embodied_gwp: float,
         server_lifetime: float,
         generation_latency: ValueOrRange,
-        batch_size: int
+        batch_size: int,
+        network_only_embodied_gwp: float,
+        network_lifetime: float
 ) -> ValueOrRange:
     """
     Compute the Global Warming Potential (GWP) embodied impact of the request.
@@ -337,11 +476,13 @@ def request_embodied_gwp(
         server_lifetime: Lifetime duration of the server in seconds.
         generation_latency: Token generation latency in seconds.
         batch_size: Number of requests handled concurrently by the server.
+        network_only_embodied_gwp: GWP embodied impact of the network equipment in kgCO2eq.
+        network_lifetime: Lifetime duration of the network equipment in seconds.
 
     Returns:
         The GWP embodied impact of the request in kgCO2eq.
     """
-    return generation_latency * server_gpu_embodied_gwp / (server_lifetime * batch_size)
+    return generation_latency * server_gpu_embodied_gwp / (server_lifetime * batch_size) + generation_latency * network_only_embodied_gwp / (network_lifetime * batch_size)
 
 
 @dag.asset
@@ -349,7 +490,9 @@ def request_embodied_adpe(
         server_gpu_embodied_adpe: float,
         server_lifetime: float,
         generation_latency: ValueOrRange,
-        batch_size: int
+        batch_size: int,
+        network_only_embodied_adpe: float,
+        network_lifetime: float
 ) -> ValueOrRange:
     """
     Compute the Abiotic Depletion Potential for Elements (ADPe) embodied impact of the request.
@@ -359,11 +502,13 @@ def request_embodied_adpe(
         server_lifetime: Lifetime duration of the server in seconds.
         generation_latency: Token generation latency in seconds.
         batch_size: Number of requests handled concurrently by the server.
+        network_only_embodied_adpe: ADPe embodied impact of the network equipment in kgSbeq.
+        network_lifetime: Lifetime duration of the network equipment in seconds.
 
     Returns:
         The ADPe embodied impact of the request in kgSbeq.
     """
-    return generation_latency * server_gpu_embodied_adpe / (server_lifetime * batch_size)
+    return generation_latency * server_gpu_embodied_adpe / (server_lifetime * batch_size) + generation_latency * network_only_embodied_adpe / (network_lifetime * batch_size)
 
 
 @dag.asset
@@ -371,7 +516,9 @@ def request_embodied_pe(
         server_gpu_embodied_pe: float,
         server_lifetime: float,
         generation_latency: ValueOrRange,
-        batch_size: int
+        batch_size: int,
+        network_only_embodied_pe: float,
+        network_lifetime: float
 ) -> ValueOrRange:
     """
     Compute the Primary Energy (PE) embodied impact of the request.
@@ -381,11 +528,39 @@ def request_embodied_pe(
         server_lifetime: Lifetime duration of the server in seconds.
         generation_latency: Token generation latency in seconds.
         batch_size: Number of requests handled concurrently by the server.
+        network_only_embodied_pe: PE embodied impact of the network equipment in MJ.
+        network_lifetime: Lifetime duration of the network equipment in seconds.
 
     Returns:
         The PE embodied impact of the request in MJ.
     """
-    return generation_latency * server_gpu_embodied_pe / (server_lifetime * batch_size)
+    return generation_latency * server_gpu_embodied_pe / (server_lifetime * batch_size) + generation_latency * network_only_embodied_pe / (network_lifetime * batch_size)
+
+
+@dag.asset
+def request_embodied_wcf(
+        server_gpu_embodied_wcf: float,
+        server_lifetime: float,
+        generation_latency: ValueOrRange,
+        batch_size: int,
+        network_only_embodied_wcf: float,
+        network_lifetime: float
+) -> ValueOrRange:
+    """
+    Compute the Water Consumption Footprint (WCF) embodied impact of the request.
+
+    Args:
+        server_gpu_embodied_wcf: WCF embodied impact of the server and the GPUs in L.
+        server_lifetime: Lifetime duration of the server in seconds.
+        generation_latency: Token generation latency in seconds.
+        batch_size: Number of requests handled concurrently by the server.
+        network_only_embodied_wcf: WCF embodied impact of the network equipment in L.
+        network_lifetime: Lifetime duration of the network equipment in seconds.
+
+    Returns:
+        The WCF embodied impact of the request in L.
+    """
+    return generation_latency * server_gpu_embodied_wcf / (server_lifetime * batch_size) + generation_latency * network_only_embodied_wcf / (network_lifetime * batch_size)
 
 
 def compute_llm_infer_impacts_dag(
@@ -410,15 +585,23 @@ def compute_llm_infer_impacts_dag(
         gpu_embodied_gwp: Optional[float] = GPU_EMBODIED_IMPACT_GWP,
         gpu_embodied_adpe: Optional[float] = GPU_EMBODIED_IMPACT_ADPE,
         gpu_embodied_pe: Optional[float] = GPU_EMBODIED_IMPACT_PE,
+        gpu_embodied_wcf: Optional[float] = GPU_EMBODIED_IMPACT_WCF,
         server_gpu_count: Optional[int] = SERVER_GPUS,
         server_power: Optional[float] = SERVER_POWER,
         server_embodied_gwp: Optional[float] = SERVER_EMBODIED_IMPACT_GWP,
         server_embodied_adpe: Optional[float] = SERVER_EMBODIED_IMPACT_ADPE,
         server_embodied_pe: Optional[float] = SERVER_EMBODIED_IMPACT_PE,
+        server_embodied_wcf: Optional[float] = SERVER_EMBODIED_IMPACT_WCF,
         server_lifetime: Optional[float] = HARDWARE_LIFESPAN,
         batch_size: Optional[float] = BATCH_SIZE,
         tps: Optional[float] = None,
         ttft: Optional[float] = None,
+        network_power: Optional[float] = NETWORK_POWER,
+        network_embodied_gwp: Optional[float] = NETWORK_EMBODIED_IMPACT_GWP,
+        network_embodied_adpe: Optional[float] = NETWORK_EMBODIED_IMPACT_ADPE,
+        network_embodied_pe: Optional[float] = NETWORK_EMBODIED_IMPACT_PE,
+        network_embodied_wcf: Optional[float] = NETWORK_EMBODIED_IMPACT_WCF,
+        network_lifetime: Optional[float] = NETWORK_LIFESPAN
 ) -> dict[str, ValueOrRange]:
     """
     Compute the impacts dag of an LLM generation request.
@@ -445,15 +628,23 @@ def compute_llm_infer_impacts_dag(
         gpu_embodied_gwp: GWP embodied impact of a single GPU.
         gpu_embodied_adpe: ADPe embodied impact of a single GPU.
         gpu_embodied_pe: PE embodied impact of a single GPU.
+        gpu_embodied_wcf: WCF embodied impact of a single GPU.
         server_gpu_count: Number of available GPUs in the server.
         server_power: Power consumption of the server in kW.
         server_embodied_gwp: GWP embodied impact of the server in kgCO2eq.
         server_embodied_adpe: ADPe embodied impact of the server in kgSbeq.
         server_embodied_pe: PE embodied impact of the server in MJ.
+        server_embodied_wcf: WCF embodied impact of the server in L.
         server_lifetime: Lifetime duration of the server in seconds.
         batch_size: Number of requests handled concurrently by the server.
         tps: Number of tokens generated per second by the model (optional).
         ttft: Time-to-first-token latency in seconds (optional).
+        network_power: Power consumption of the network equipment in kW.
+        network_embodied_gwp: GWP embodied impact of the network equipment in kgCO2eq.
+        network_embodied_adpe: ADPe embodied impact of the network equipment in kgSbeq.
+        network_embodied_pe: PE embodied impact of the network equipment in MJ.
+        network_embodied_wcf: WCF embodied impact of the network equipment in L.
+        network_lifetime: Lifetime duration of the network equipment in seconds.
     Returns:
         The environmental impacts dag with all intermediate states.
     """
@@ -479,15 +670,23 @@ def compute_llm_infer_impacts_dag(
         gpu_embodied_gwp=gpu_embodied_gwp,
         gpu_embodied_adpe=gpu_embodied_adpe,
         gpu_embodied_pe=gpu_embodied_pe,
+        gpu_embodied_wcf=gpu_embodied_wcf,
         server_gpu_count=server_gpu_count,
         server_power=server_power,
         server_embodied_gwp=server_embodied_gwp,
         server_embodied_adpe=server_embodied_adpe,
         server_embodied_pe=server_embodied_pe,
+        server_embodied_wcf=server_embodied_wcf,
         server_lifetime=server_lifetime,
         batch_size=batch_size,
         tps=tps,
         ttft=ttft,
+        network_power=network_power,
+        network_embodied_gwp=network_embodied_gwp,
+        network_embodied_adpe=network_embodied_adpe,
+        network_embodied_pe=network_embodied_pe,
+        network_embodied_wcf=network_embodied_wcf,
+        network_lifetime=network_lifetime
     )
     return results
 
@@ -545,7 +744,7 @@ def compute_llm_infer_impacts(
 
     results: dict[str, Union[RangeValue, float, int]] = {}
     fields = ["request_energy", "request_usage_gwp", "request_usage_adpe", "request_usage_pe", "request_usage_wcf",
-              "request_embodied_gwp", "request_embodied_adpe", "request_embodied_pe"]
+              "request_embodied_gwp", "request_embodied_adpe", "request_embodied_pe", "request_embodied_wcf"]
     for act_param, tot_param in zip(active_params, total_params):
         res = compute_llm_infer_impacts_dag(
             model_active_parameter_count=act_param,
@@ -582,13 +781,14 @@ def compute_llm_infer_impacts(
     gwp_embodied = GWP(value=results["request_embodied_gwp"])
     adpe_embodied = ADPe(value=results["request_embodied_adpe"])
     pe_embodied = PE(value=results["request_embodied_pe"])
+    wcf_embodied = WCF(value=results["request_embodied_wcf"])
 
     return Impacts(
         energy=energy,
         gwp=gwp_usage + gwp_embodied,
         adpe=adpe_usage + adpe_embodied,
         pe=pe_usage + pe_embodied,
-        wcf=wcf_usage,
+        wcf=wcf_usage + wcf_embodied,
         usage=Usage(
             energy=energy,
             gwp=gwp_usage,
@@ -599,6 +799,7 @@ def compute_llm_infer_impacts(
         embodied=Embodied(
             gwp=gwp_embodied,
             adpe=adpe_embodied,
-            pe=pe_embodied
+            pe=pe_embodied,
+            wcf=wcf_embodied
         )
     )
