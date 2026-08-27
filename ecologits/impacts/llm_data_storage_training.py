@@ -4,27 +4,27 @@ import datetime
 from typing import Any
 
 from ecologits.impacts.llm_training import (
-    FLOPS_PER_WATT,
-    GPU_UTILIZATION_RATE,
-    INFERENCE_COMPUTE_SHARE,
-    MODEL_LIFESPAN,
     inference_compute_capacity_per_model,
     total_output_tokens,
     training_flops,
 )
+from ecologits.impacts.constants import (
+    FLOPS_PER_WATT,
+    GPU_UTILIZATION_RATE,
+    HDD_EMBODIED_IMPACT_ADPE,
+    HDD_EMBODIED_IMPACT_GWP,
+    HDD_EMBODIED_IMPACT_PE,
+    HDD_EMBODIED_IMPACT_WCF,
+    HDD_LIFESPAN,
+    HDD_POWER,
+    HDD_USAGE_RATIO,
+    HDD_VOLUME,
+    INFERENCE_COMPUTE_SHARE,
+    MODEL_LIFESPAN,
+    STORAGE_DURATION,
+)
 from ecologits.impacts.modeling import ADPe, Embodied, Energy, GWP, Impacts, PE, Usage, WCF
 from ecologits.utils.range_value import RangeValue, ValueOrRange
-
-STORAGE_DURATION = 100 * 24  # hours
-HDD_VOLUME = 30  # TB
-HDD_POWER = 0.0095  # kW
-HDD_USAGE_RATIO = 0.2
-HDD_EMBODIED_IMPACT_GWP = 640.5
-HDD_EMBODIED_IMPACT_ADPE = 0.0
-HDD_EMBODIED_IMPACT_PE = 0.0
-HDD_EMBODIED_IMPACT_WCF = 163480.0
-HDD_LIFESPAN = 5 * 365 * 24 * 60 * 60
-
 
 def _bounds(value: ValueOrRange) -> tuple[float, float]:
     if isinstance(value, RangeValue):

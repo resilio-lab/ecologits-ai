@@ -2,39 +2,32 @@ import math
 from typing import Any, Optional, Union, cast
 
 from ecologits.impacts.dag import DAG
+from ecologits.impacts.constants import (
+    BATCH_SIZE,
+    GPU_EMBODIED_IMPACT_ADPE,
+    GPU_EMBODIED_IMPACT_GWP,
+    GPU_EMBODIED_IMPACT_PE,
+    GPU_MEMORY,
+    HARDWARE_LIFESPAN,
+    LATENCY_ALPHA,
+    LATENCY_BETA,
+    LATENCY_GAMMA,
+    MODEL_QUANTIZATION_BITS,
+    NETWORK_EMBODIED_IMPACT_ADPE,
+    NETWORK_EMBODIED_IMPACT_GWP,
+    NETWORK_EMBODIED_IMPACT_PE,
+    NETWORK_EMBODIED_IMPACT_WCF,
+    NETWORK_LIFESPAN,
+    NETWORK_POWER,
+    SERVER_EMBODIED_IMPACT_ADPE,
+    SERVER_EMBODIED_IMPACT_GWP,
+    SERVER_EMBODIED_IMPACT_PE,
+    SERVER_GPUS,
+    SERVER_POWER,
+)
+from ecologits.impacts.constants import GPU_ENERGY_ALPHA, GPU_ENERGY_BETA, GPU_ENERGY_GAMMA
 from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.utils.range_value import RangeValue, ValueOrRange
-
-MODEL_QUANTIZATION_BITS = 16
-
-GPU_ENERGY_ALPHA = 1.1665273170451914e-06
-GPU_ENERGY_BETA = -0.011205921025579175
-GPU_ENERGY_GAMMA = 4.052928146734005e-05
-
-LATENCY_ALPHA = 0.0006785088094353663
-LATENCY_BETA = 0.0003119310311688259
-LATENCY_GAMMA = 0.019473717579473387
-
-GPU_MEMORY = 80  # GB
-GPU_EMBODIED_IMPACT_GWP = 273
-GPU_EMBODIED_IMPACT_ADPE = 0.00895
-GPU_EMBODIED_IMPACT_PE = 3721
-
-SERVER_GPUS = 8
-SERVER_POWER = 1.2  # kW
-SERVER_EMBODIED_IMPACT_GWP = 5700
-SERVER_EMBODIED_IMPACT_ADPE = 0.37
-SERVER_EMBODIED_IMPACT_PE = 70000
-
-HARDWARE_LIFESPAN = 3 * 365 * 24 * 60 * 60
-
-BATCH_SIZE = 64
-NETWORK_POWER = 0.09 * 0.0358 + 0.09 * 0.286 + 0.09 * 1.468
-NETWORK_EMBODIED_IMPACT_GWP = 333.8 * 0.0358 + 403 * 0.286 + 363 * 1.468
-NETWORK_EMBODIED_IMPACT_ADPE = 0.0
-NETWORK_EMBODIED_IMPACT_PE = 0.0
-NETWORK_EMBODIED_IMPACT_WCF = 94100 * 0.0358 + 115765 * 0.286 + 104795 * 1.468
-NETWORK_LIFESPAN = 5 * 365 * 24 * 60 * 60
 
 dag = DAG()
 
@@ -170,6 +163,18 @@ def server_energy(
 
 
 @dag.asset
+def network_energy(
+        generation_latency: float,
+        network_power: float,
+        server_gpu_count: int,
+        gpu_required_count: int,
+        batch_size: int,
+) -> float:
+    """Compute network equipment energy allocated to the request."""
+    return generation_latency / 3600 * network_power * gpu_required_count / server_gpu_count / batch_size
+
+
+@dag.asset
 def request_energy(
         datacenter_pue: float,
         request_it_energy: ValueOrRange
@@ -191,7 +196,8 @@ def request_energy(
 def request_it_energy(
         server_energy: float,
         gpu_required_count: int,
-        gpu_energy: ValueOrRange
+        gpu_energy: ValueOrRange,
+        network_energy: float,
 ) -> ValueOrRange:
     """
     Compute the IT energy consumption of the request before data center overhead.
@@ -204,7 +210,7 @@ def request_it_energy(
     Returns:
         The IT energy consumption of the request in kWh.
     """
-    return server_energy + gpu_required_count * gpu_energy
+    return server_energy + gpu_required_count * gpu_energy + network_energy
 
 
 @dag.asset
@@ -445,6 +451,7 @@ def compute_llm_impacts_dag(
         batch_size: Optional[float] = BATCH_SIZE,
         tps: Optional[float] = None,
         ttft: Optional[float] = None,
+        network_power: Optional[float] = NETWORK_POWER,
 ) -> dict[str, ValueOrRange]:
     """
     Compute the impacts dag of an LLM generation request.
@@ -514,6 +521,7 @@ def compute_llm_impacts_dag(
         batch_size=batch_size,
         tps=tps,
         ttft=ttft,
+        network_power=network_power,
     )
     return results
 
@@ -603,25 +611,22 @@ def compute_llm_impacts(
         results["generation_latency"] = res["generation_latency"]
         results["gpu_required_count"] = res["gpu_required_count"]
 
-    generation = results.get("generation_latency", request_latency)
-    gpu_count = results.get("gpu_required_count", 1)
+    energy = Energy(value=results["request_energy"])
+    gwp_usage = GWP(value=results["request_usage_gwp"])
+    adpe_usage = ADPe(value=results["request_usage_adpe"])
+    pe_usage = PE(value=results["request_usage_pe"])
+    wcf_usage = WCF(value=results["request_usage_wcf"])
+    gwp_embodied = GWP(value=results["request_embodied_gwp"])
+    adpe_embodied = ADPe(value=results["request_embodied_adpe"])
+    pe_embodied = PE(value=results["request_embodied_pe"])
+    generation = results["generation_latency"]
+    gpu_count = results["gpu_required_count"]
     batch_size = kwargs.get("batch_size", BATCH_SIZE)
     server_gpu_count = kwargs.get("server_gpu_count", SERVER_GPUS)
-    network_request_energy = network_energy(
-        generation, kwargs.get("network_power", NETWORK_POWER), server_gpu_count,
-        gpu_count, batch_size,
-    ) * datacenter_pue
-    energy = Energy(value=results["request_energy"] + network_request_energy)
-    gwp_usage = GWP(value=energy.value * if_electricity_mix_gwp)
-    adpe_usage = ADPe(value=energy.value * if_electricity_mix_adpe)
-    pe_usage = PE(value=energy.value * if_electricity_mix_pe)
-    request_it_energy = results["request_energy"] / datacenter_pue
-    wcf_usage = WCF(value=(request_it_energy + network_request_energy / datacenter_pue)
-                    * (datacenter_wue + datacenter_pue * if_electricity_mix_wue))
     network_share = generation / (NETWORK_LIFESPAN * batch_size) * gpu_count / server_gpu_count
-    gwp_embodied = GWP(value=results["request_embodied_gwp"] + network_share * NETWORK_EMBODIED_IMPACT_GWP)
-    adpe_embodied = ADPe(value=results["request_embodied_adpe"] + network_share * NETWORK_EMBODIED_IMPACT_ADPE)
-    pe_embodied = PE(value=results["request_embodied_pe"] + network_share * NETWORK_EMBODIED_IMPACT_PE)
+    gwp_embodied = GWP(value=gwp_embodied.value + network_share * NETWORK_EMBODIED_IMPACT_GWP)
+    adpe_embodied = ADPe(value=adpe_embodied.value + network_share * NETWORK_EMBODIED_IMPACT_ADPE)
+    pe_embodied = PE(value=pe_embodied.value + network_share * NETWORK_EMBODIED_IMPACT_PE)
     wcf_embodied = WCF(value=network_share * NETWORK_EMBODIED_IMPACT_WCF)
 
     return Impacts(
@@ -648,13 +653,6 @@ def compute_llm_impacts(
 
 compute_llm_infer_impacts = compute_llm_impacts
 compute_llm_infer_impacts_dag = compute_llm_impacts_dag
-
-
-def network_energy(
-    generation_latency: float, network_power: float, server_gpu_count: int,
-    gpu_required_count: int, batch_size: int,
-) -> float:
-    return generation_latency / 3600 * network_power * gpu_required_count / server_gpu_count / batch_size
 
 
 def network_only_embodied_gwp(network_embodied_gwp: float, server_gpu_count: float, gpu_required_count: int) -> float:
