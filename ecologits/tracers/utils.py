@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import os
 
 from pydantic import BaseModel
 
@@ -226,3 +228,26 @@ PROVIDER_CONFIG_MAP = {
         datacenter_wue=0.569,
     )
 }
+
+
+def _load_lifecycle_provider_data() -> None:
+    filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "data", "providers.json")
+    if not os.path.exists(filepath):
+        return
+    with open(filepath) as fd:
+        data = json.load(fd)
+    for provider in data.get("providers", []):
+        pue = provider["datacenter_pue"]
+        wue = provider["datacenter_wue"]
+        pue_value = RangeValue(min=pue["min"], max=pue["max"]) if pue["type"] == "range" else pue["value"]
+        wue_value = RangeValue(min=wue["min"], max=wue["max"]) if wue["type"] == "range" else wue["value"]
+        PROVIDER_CONFIG_MAP[provider["name"]] = _ProviderConfig(
+            datacenter_location=provider["datacenter_location"],
+            datacenter_pue=pue_value,
+            datacenter_wue=wue_value,
+            compute_capacity={k: v for k, v in provider.get("compute_capacity", {}).items() if v is not None},
+            number_of_active_models={k: v for k, v in provider.get("number_of_active_models", {}).items() if v is not None},
+        )
+
+
+_load_lifecycle_provider_data()
