@@ -32,4 +32,4 @@ def test_compute_llm_train_impacts_returns_compatible_impacts() -> None:
 
     assert impacts.energy.value > 0
     assert impacts.gwp.value > impacts.usage.gwp.value
-    assert impacts.wcf.value == impacts.usage.wcf.value
+    assert impacts.wcf.value > impacts.usage.wcf.value

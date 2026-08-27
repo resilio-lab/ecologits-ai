@@ -29,6 +29,12 @@ SERVER_EMBODIED_IMPACT_PE = 70000
 HARDWARE_LIFESPAN = 3 * 365 * 24 * 60 * 60
 
 BATCH_SIZE = 64
+NETWORK_POWER = 0.09 * 0.0358 + 0.09 * 0.286 + 0.09 * 1.468
+NETWORK_EMBODIED_IMPACT_GWP = 333.8 * 0.0358 + 403 * 0.286 + 363 * 1.468
+NETWORK_EMBODIED_IMPACT_ADPE = 0.0
+NETWORK_EMBODIED_IMPACT_PE = 0.0
+NETWORK_EMBODIED_IMPACT_WCF = 94100 * 0.0358 + 115765 * 0.286 + 104795 * 1.468
+NETWORK_LIFESPAN = 5 * 365 * 24 * 60 * 60
 
 dag = DAG()
 
@@ -593,22 +599,37 @@ def compute_llm_impacts(
                 results[field] = RangeValue(min=min_result, max=max_result)
             else:
                 results[field] = res[field]
+        # Keep intermediate values needed for the network allocation below.
+        results["generation_latency"] = res["generation_latency"]
+        results["gpu_required_count"] = res["gpu_required_count"]
 
-    energy = Energy(value=results["request_energy"])
-    gwp_usage = GWP(value=results["request_usage_gwp"])
-    adpe_usage = ADPe(value=results["request_usage_adpe"])
-    pe_usage = PE(value=results["request_usage_pe"])
-    wcf_usage = WCF(value=results["request_usage_wcf"])
-    gwp_embodied = GWP(value=results["request_embodied_gwp"])
-    adpe_embodied = ADPe(value=results["request_embodied_adpe"])
-    pe_embodied = PE(value=results["request_embodied_pe"])
+    generation = results.get("generation_latency", request_latency)
+    gpu_count = results.get("gpu_required_count", 1)
+    batch_size = kwargs.get("batch_size", BATCH_SIZE)
+    server_gpu_count = kwargs.get("server_gpu_count", SERVER_GPUS)
+    network_request_energy = network_energy(
+        generation, kwargs.get("network_power", NETWORK_POWER), server_gpu_count,
+        gpu_count, batch_size,
+    ) * datacenter_pue
+    energy = Energy(value=results["request_energy"] + network_request_energy)
+    gwp_usage = GWP(value=energy.value * if_electricity_mix_gwp)
+    adpe_usage = ADPe(value=energy.value * if_electricity_mix_adpe)
+    pe_usage = PE(value=energy.value * if_electricity_mix_pe)
+    request_it_energy = results["request_energy"] / datacenter_pue
+    wcf_usage = WCF(value=(request_it_energy + network_request_energy / datacenter_pue)
+                    * (datacenter_wue + datacenter_pue * if_electricity_mix_wue))
+    network_share = generation / (NETWORK_LIFESPAN * batch_size) * gpu_count / server_gpu_count
+    gwp_embodied = GWP(value=results["request_embodied_gwp"] + network_share * NETWORK_EMBODIED_IMPACT_GWP)
+    adpe_embodied = ADPe(value=results["request_embodied_adpe"] + network_share * NETWORK_EMBODIED_IMPACT_ADPE)
+    pe_embodied = PE(value=results["request_embodied_pe"] + network_share * NETWORK_EMBODIED_IMPACT_PE)
+    wcf_embodied = WCF(value=network_share * NETWORK_EMBODIED_IMPACT_WCF)
 
     return Impacts(
         energy=energy,
         gwp=gwp_usage + gwp_embodied,
         adpe=adpe_usage + adpe_embodied,
         pe=pe_usage + pe_embodied,
-        wcf=wcf_usage,
+        wcf=wcf_usage + wcf_embodied,
         usage=Usage(
             energy=energy,
             gwp=gwp_usage,
@@ -619,6 +640,34 @@ def compute_llm_impacts(
         embodied=Embodied(
             gwp=gwp_embodied,
             adpe=adpe_embodied,
-            pe=pe_embodied
+            pe=pe_embodied,
+            wcf=wcf_embodied,
         )
     )
+
+
+compute_llm_infer_impacts = compute_llm_impacts
+compute_llm_infer_impacts_dag = compute_llm_impacts_dag
+
+
+def network_energy(
+    generation_latency: float, network_power: float, server_gpu_count: int,
+    gpu_required_count: int, batch_size: int,
+) -> float:
+    return generation_latency / 3600 * network_power * gpu_required_count / server_gpu_count / batch_size
+
+
+def network_only_embodied_gwp(network_embodied_gwp: float, server_gpu_count: float, gpu_required_count: int) -> float:
+    return gpu_required_count / server_gpu_count * network_embodied_gwp
+
+
+def network_only_embodied_adpe(network_embodied_adpe: float, server_gpu_count: float, gpu_required_count: int) -> float:
+    return gpu_required_count / server_gpu_count * network_embodied_adpe
+
+
+def network_only_embodied_pe(network_embodied_pe: float, server_gpu_count: float, gpu_required_count: int) -> float:
+    return gpu_required_count / server_gpu_count * network_embodied_pe
+
+
+def network_only_embodied_wcf(network_embodied_wcf: float, server_gpu_count: float, gpu_required_count: int) -> float:
+    return gpu_required_count / server_gpu_count * network_embodied_wcf

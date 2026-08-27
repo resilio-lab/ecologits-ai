@@ -25,6 +25,11 @@ SERVER_EMBODIED_GWP = 5700.0
 SERVER_EMBODIED_ADPE = 0.37
 SERVER_EMBODIED_PE = 70000.0
 SERVER_LIFESPAN = 3 * 365 * 24 * 60 * 60
+NETWORK_EMBODIED_GWP = 333.8 * 0.0358 + 403 * 0.286 + 363 * 1.468
+NETWORK_EMBODIED_ADPE = 0.0
+NETWORK_EMBODIED_PE = 0.0
+NETWORK_EMBODIED_WCF = 94100 * 0.0358 + 115765 * 0.286 + 104795 * 1.468
+NETWORK_LIFESPAN = 5 * 365 * 24 * 60 * 60
 
 
 def _bounds(value: ValueOrRange) -> tuple[float, float]:
@@ -164,17 +169,23 @@ def compute_llm_train_impacts(  # noqa: PLR0917 - calculation API mirrors infere
             ),
             tokens, output_token_count,
         )
+    for name, impact in (("gwp", NETWORK_EMBODIED_GWP), ("adpe", NETWORK_EMBODIED_ADPE),
+                         ("pe", NETWORK_EMBODIED_PE), ("wcf", NETWORK_EMBODIED_WCF)):
+        embodied_values[name] = _allocated(
+            embodied_hours * impact / (NETWORK_LIFESPAN / 3600), tokens, output_token_count,
+        ) + embodied_values.get(name, 0)
     embodied_gwp = GWP(value=embodied_values["gwp"])
     embodied_adpe = ADPe(value=embodied_values["adpe"])
     embodied_pe = PE(value=embodied_values["pe"])
+    embodied_wcf = WCF(value=embodied_values["wcf"])
     return Impacts(
         energy=usage_energy,
         gwp=usage_gwp + embodied_gwp,
         adpe=usage_adpe + embodied_adpe,
         pe=usage_pe + embodied_pe,
-        wcf=usage_wcf,
+        wcf=usage_wcf + embodied_wcf,
         usage=Usage(energy=usage_energy, gwp=usage_gwp, adpe=usage_adpe, pe=usage_pe, wcf=usage_wcf),
-        embodied=Embodied(gwp=embodied_gwp, adpe=embodied_adpe, pe=embodied_pe),
+        embodied=Embodied(gwp=embodied_gwp, adpe=embodied_adpe, pe=embodied_pe, wcf=embodied_wcf),
     )
 
 

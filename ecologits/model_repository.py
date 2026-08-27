@@ -1,5 +1,6 @@
 import json
 import os
+import datetime
 from enum import Enum
 from typing import Any, Optional, Union
 
@@ -63,6 +64,7 @@ class Model(BaseModel):
     warnings: list[WarningMessage] = []
     sources: list[str] = []
     deployment: Deployment | None = None
+    publication_date: datetime.datetime = datetime.datetime(2020, 1, 1)
 
     @property
     def has_warnings(self) -> bool:
@@ -86,6 +88,7 @@ class Model(BaseModel):
             warnings=warnings,
             sources=sources,
             deployment=deployment,
+            publication_date=data.get("publication_date", datetime.datetime(2020, 1, 1)),
         )
 
 

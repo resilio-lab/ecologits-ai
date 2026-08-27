@@ -204,6 +204,7 @@ class Embodied(Phase):
     gwp: GWP
     adpe: ADPe
     pe: PE
+    wcf: WCF = WCF(value=0)
 
 
 class Impacts(BaseModel):
