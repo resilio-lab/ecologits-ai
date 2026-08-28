@@ -19,18 +19,14 @@ from ecologits.impacts.constants import (
     STORAGE_DURATION,
 )
 from ecologits.impacts.llm_training import (
+    _allocated,
+    _bounds,
     inference_compute_capacity_per_model,
     total_output_tokens,
     training_flops,
 )
 from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.utils.range_value import RangeValue, ValueOrRange
-
-
-def _bounds(value: ValueOrRange) -> tuple[float, float]:
-    if isinstance(value, RangeValue):
-        return float(value.min), float(value.max)
-    return float(value), float(value)
 
 
 def training_tokens(
@@ -60,13 +56,6 @@ def hdd_energy_training(
     storage_duration: float = STORAGE_DURATION,
 ) -> ValueOrRange:
     return hdd_count * hdd_power * hdd_usage_ratio * storage_duration
-
-
-def _allocated(total: ValueOrRange, total_tokens: ValueOrRange, output_token_count: float) -> ValueOrRange:
-    total_min, total_max = _bounds(total)
-    tokens_min, tokens_max = _bounds(total_tokens)
-    values = (total_min * output_token_count / tokens_max, total_max * output_token_count / tokens_min)
-    return values[0] if values[0] == values[1] else RangeValue(min=values[0], max=values[1])
 
 
 def compute_llm_train_data_storage_impacts(
@@ -117,6 +106,9 @@ def compute_llm_train_data_storage_impacts(
     usage_wcf = WCF(value=usage_energy.value * (datacenter_wue + datacenter_pue * if_electricity_mix_wue))
     storage_hours = kwargs.get("storage_duration", STORAGE_DURATION)
     lifetime = kwargs.get("hdd_lifetime", HDD_LIFESPAN)
+    # storage_duration is in hours while HDD_LIFESPAN is in seconds: convert the
+    # lifetime to hours so the ratio matches the training module's allocation
+    # (PR #1 divided hours by seconds here, understating embodied impacts ~3600x).
     embodied = _allocated(
         hdds * storage_hours / (lifetime / 3600), total_tokens, output_token_count
     )

@@ -14,6 +14,7 @@ from ecologits.impacts.constants import (
     GPU_EMBODIED_IMPACT_ADPE,
     GPU_EMBODIED_IMPACT_GWP,
     GPU_EMBODIED_IMPACT_PE,
+    GPU_EMBODIED_IMPACT_WCF,
     GPU_UTILIZATION_RATE,
     HARDWARE_LIFESPAN,
     INFERENCE_COMPUTE_SHARE,
@@ -26,25 +27,12 @@ from ecologits.impacts.constants import (
     SERVER_EMBODIED_IMPACT_ADPE,
     SERVER_EMBODIED_IMPACT_GWP,
     SERVER_EMBODIED_IMPACT_PE,
+    SERVER_EMBODIED_IMPACT_WCF,
     SERVER_GPU_NETWORK_POWER,
     SERVER_GPUS,
 )
 from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.utils.range_value import RangeValue, ValueOrRange
-
-SERVER_GPU_COUNT = SERVER_GPUS
-SERVER_GPU_POWER = SERVER_GPU_NETWORK_POWER
-GPU_EMBODIED_GWP = GPU_EMBODIED_IMPACT_GWP
-GPU_EMBODIED_ADPE = GPU_EMBODIED_IMPACT_ADPE
-GPU_EMBODIED_PE = GPU_EMBODIED_IMPACT_PE
-SERVER_EMBODIED_GWP = SERVER_EMBODIED_IMPACT_GWP
-SERVER_EMBODIED_ADPE = SERVER_EMBODIED_IMPACT_ADPE
-SERVER_EMBODIED_PE = SERVER_EMBODIED_IMPACT_PE
-SERVER_LIFESPAN = HARDWARE_LIFESPAN
-NETWORK_EMBODIED_GWP = NETWORK_EMBODIED_IMPACT_GWP
-NETWORK_EMBODIED_ADPE = NETWORK_EMBODIED_IMPACT_ADPE
-NETWORK_EMBODIED_PE = NETWORK_EMBODIED_IMPACT_PE
-NETWORK_EMBODIED_WCF = NETWORK_EMBODIED_IMPACT_WCF
 
 
 def _bounds(value: ValueOrRange) -> tuple[float, float]:
@@ -95,7 +83,7 @@ def server_hours_training(
     training_flops: ValueOrRange,
     flops_per_gpu: float = FLOPS_PER_GPU,
     gpu_utilization_rate: float = GPU_UTILIZATION_RATE,
-    server_gpu_count: float = SERVER_GPU_COUNT,
+    server_gpu_count: float = SERVER_GPUS,
 ) -> ValueOrRange:
     """Convert training FLOPs to server-hours."""
     return training_flops / (flops_per_gpu * gpu_utilization_rate * server_gpu_count) / 3600
@@ -103,7 +91,7 @@ def server_hours_training(
 
 def total_training_energy(
     server_hours: ValueOrRange,
-    total_power: float = SERVER_GPU_POWER,
+    total_power: float = SERVER_GPU_NETWORK_POWER,
     datacenter_pue: ValueOrRange = 1.0,
 ) -> ValueOrRange:
     """Return total training energy in kWh."""
@@ -135,7 +123,9 @@ def compute_llm_train_impacts(
     """Estimate training impacts allocated to one inference request.
 
     Optional keyword arguments customize the hardware and regression defaults.
-    Network and training-data-storage impacts are intentionally not included.
+    Network equipment is included in the training energy (server power) and in
+    the embodied impacts. Training-data-storage impacts are estimated separately
+    by ``compute_llm_train_data_storage_impacts``.
     """
     capacity = inference_compute_capacity_per_model(
         publication_date, compute_capacity, number_of_active_models,
@@ -148,12 +138,12 @@ def compute_llm_train_impacts(
     )
     flops = training_flops(publication_date, model_total_parameter_count)
     hours = server_hours_training(
-        flops, kwargs.get("flops_per_gpu", kwargs.get("flops_per_GPU", FLOPS_PER_GPU)),
+        flops, kwargs.get("flops_per_gpu", FLOPS_PER_GPU),
         kwargs.get("gpu_utilization_rate", GPU_UTILIZATION_RATE),
-        kwargs.get("server_gpu_count", SERVER_GPU_COUNT),
+        kwargs.get("server_gpu_count", SERVER_GPUS),
     )
     energy_value = _allocated(total_training_energy(
-        hours, kwargs.get("total_power", SERVER_GPU_POWER), datacenter_pue,
+        hours, kwargs.get("total_power", SERVER_GPU_NETWORK_POWER), datacenter_pue,
     ), tokens, output_token_count)
     usage_energy = Energy(value=energy_value)
     usage_gwp = GWP(value=usage_energy.value * if_electricity_mix_gwp)
@@ -161,31 +151,35 @@ def compute_llm_train_impacts(
     usage_pe = PE(value=usage_energy.value * if_electricity_mix_pe)
     usage_wcf = WCF(value=usage_energy.value * (datacenter_wue + datacenter_pue * if_electricity_mix_wue))
 
-    server_gpu_count = kwargs.get("server_gpu_count", SERVER_GPU_COUNT)
+    server_gpu_count = kwargs.get("server_gpu_count", SERVER_GPUS)
     embodied_hours = hours
     embodied_values = {}
     for name, server, gpu in (
         (
-            "gwp", kwargs.get("server_embodied_gwp", SERVER_EMBODIED_GWP),
-            kwargs.get("gpu_embodied_gwp", GPU_EMBODIED_GWP),
+            "gwp", kwargs.get("server_embodied_gwp", SERVER_EMBODIED_IMPACT_GWP),
+            kwargs.get("gpu_embodied_gwp", GPU_EMBODIED_IMPACT_GWP),
         ),
         (
-            "adpe", kwargs.get("server_embodied_adpe", SERVER_EMBODIED_ADPE),
-            kwargs.get("gpu_embodied_adpe", GPU_EMBODIED_ADPE),
+            "adpe", kwargs.get("server_embodied_adpe", SERVER_EMBODIED_IMPACT_ADPE),
+            kwargs.get("gpu_embodied_adpe", GPU_EMBODIED_IMPACT_ADPE),
         ),
         (
-            "pe", kwargs.get("server_embodied_pe", SERVER_EMBODIED_PE),
-            kwargs.get("gpu_embodied_pe", GPU_EMBODIED_PE),
+            "pe", kwargs.get("server_embodied_pe", SERVER_EMBODIED_IMPACT_PE),
+            kwargs.get("gpu_embodied_pe", GPU_EMBODIED_IMPACT_PE),
+        ),
+        (
+            "wcf", kwargs.get("server_embodied_wcf", SERVER_EMBODIED_IMPACT_WCF),
+            kwargs.get("gpu_embodied_wcf", GPU_EMBODIED_IMPACT_WCF),
         ),
     ):
         embodied_values[name] = _allocated(
             embodied_hours * (server + gpu * server_gpu_count) / (
-                kwargs.get("server_lifetime", SERVER_LIFESPAN) / 3600
+                kwargs.get("server_lifetime", HARDWARE_LIFESPAN) / 3600
             ),
             tokens, output_token_count,
         )
-    for name, impact in (("gwp", NETWORK_EMBODIED_GWP), ("adpe", NETWORK_EMBODIED_ADPE),
-                         ("pe", NETWORK_EMBODIED_PE), ("wcf", NETWORK_EMBODIED_WCF)):
+    for name, impact in (("gwp", NETWORK_EMBODIED_IMPACT_GWP), ("adpe", NETWORK_EMBODIED_IMPACT_ADPE),
+                         ("pe", NETWORK_EMBODIED_IMPACT_PE), ("wcf", NETWORK_EMBODIED_IMPACT_WCF)):
         embodied_values[name] = _allocated(
             embodied_hours * impact / (NETWORK_LIFESPAN / 3600), tokens, output_token_count,
         ) + embodied_values.get(name, 0)
