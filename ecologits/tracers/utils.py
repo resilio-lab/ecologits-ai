@@ -27,7 +27,7 @@ class ImpactsOutput(BaseModel):
         gwp: Total Global Warming Potential (GWP) impact
         adpe: Total Abiotic Depletion Potential for Elements (ADPe) impact
         pe: Total Primary Energy (PE) impact
-        wcf: Usage-only Water Consumption Footprint (WCF) impact
+        wcf: Total Water Consumption Footprint (WCF) impact
         usage: Impacts for the usage phase
         embodied: Impacts for the embodied phase
         warnings: List of warnings
@@ -146,7 +146,9 @@ def _lifecycle_impacts(provider: str, model_name: str, output_token_count: int,
                        calculator: Callable[..., Impacts]) -> ImpactsOutput:
     model = models.find_model(provider=provider, model_name=model_name)
     if model is None:
-        error = ModelNotRegisteredError(message=f"Could not find model `{model_name}` for {provider} provider.")
+        error: ErrorMessage = ModelNotRegisteredError(
+            message=f"Could not find model `{model_name}` for {provider} provider."
+        )
         logger.warning_once(str(error))
         return ImpactsOutput(errors=[error])
     config = PROVIDER_CONFIG_MAP[provider]
@@ -184,9 +186,6 @@ def llm_train_data_storage_impacts(provider: str, model_name: str, output_token_
                                    electricity_mix_zone: str | None = None) -> ImpactsOutput:
     return _lifecycle_impacts(provider, model_name, output_token_count, electricity_mix_zone,
                               compute_llm_train_data_storage_impacts)
-
-
-llm_infer_impacts = llm_impacts
 
 
 @dataclass
@@ -233,6 +232,15 @@ PROVIDER_CONFIG_MAP = {
 
 
 def _load_lifecycle_provider_data() -> None:
+    """Merge compute-capacity data from ``data/providers.json`` into ``PROVIDER_CONFIG_MAP``.
+
+    ``providers.json`` is the source of truth for the lifecycle fields
+    (``compute_capacity`` and ``number_of_active_models``) and contributes any
+    provider missing from the hardcoded map. The datacenter configuration
+    (location, PUE, WUE) of providers already present above is left untouched so
+    that the inference behavior cannot drift with the data file. The hardcoded
+    map doubles as fallback when the file is absent.
+    """
     filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "data", "providers.json")
     if not os.path.exists(filepath):
         return
