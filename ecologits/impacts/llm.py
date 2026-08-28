@@ -1,12 +1,14 @@
 import math
 from typing import Any, Optional, Union, cast
 
-from ecologits.impacts.dag import DAG
 from ecologits.impacts.constants import (
     BATCH_SIZE,
     GPU_EMBODIED_IMPACT_ADPE,
     GPU_EMBODIED_IMPACT_GWP,
     GPU_EMBODIED_IMPACT_PE,
+    GPU_ENERGY_ALPHA,
+    GPU_ENERGY_BETA,
+    GPU_ENERGY_GAMMA,
     GPU_MEMORY,
     HARDWARE_LIFESPAN,
     LATENCY_ALPHA,
@@ -25,7 +27,7 @@ from ecologits.impacts.constants import (
     SERVER_GPUS,
     SERVER_POWER,
 )
-from ecologits.impacts.constants import GPU_ENERGY_ALPHA, GPU_ENERGY_BETA, GPU_ENERGY_GAMMA
+from ecologits.impacts.dag import DAG
 from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.utils.range_value import RangeValue, ValueOrRange
 

@@ -3,11 +3,6 @@
 import datetime
 from typing import Any
 
-from ecologits.impacts.llm_training import (
-    inference_compute_capacity_per_model,
-    total_output_tokens,
-    training_flops,
-)
 from ecologits.impacts.constants import (
     FLOPS_PER_WATT,
     GPU_UTILIZATION_RATE,
@@ -23,8 +18,14 @@ from ecologits.impacts.constants import (
     MODEL_LIFESPAN,
     STORAGE_DURATION,
 )
-from ecologits.impacts.modeling import ADPe, Embodied, Energy, GWP, Impacts, PE, Usage, WCF
+from ecologits.impacts.llm_training import (
+    inference_compute_capacity_per_model,
+    total_output_tokens,
+    training_flops,
+)
+from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.utils.range_value import RangeValue, ValueOrRange
+
 
 def _bounds(value: ValueOrRange) -> tuple[float, float]:
     if isinstance(value, RangeValue):
@@ -93,10 +94,20 @@ def compute_llm_train_data_storage_impacts(
         kwargs.get("gpu_utilization_rate", GPU_UTILIZATION_RATE),
         kwargs.get("model_lifespan", MODEL_LIFESPAN), model_active_parameter_count,
     )
-    train_data = training_data_volume(training_tokens(training_flops(publication_date, model_total_parameter_count), model_active_parameter_count))
+    train_data = training_data_volume(
+        training_tokens(
+            training_flops(publication_date, model_total_parameter_count),
+            model_active_parameter_count,
+        )
+    )
     hdds = hdd_required_count(train_data, kwargs.get("hdd_volume", HDD_VOLUME))
     energy = _allocated(
-        hdd_energy_training(hdds, kwargs.get("hdd_power", HDD_POWER), kwargs.get("hdd_usage_ratio", HDD_USAGE_RATIO), kwargs.get("storage_duration", STORAGE_DURATION)),
+        hdd_energy_training(
+            hdds,
+            kwargs.get("hdd_power", HDD_POWER),
+            kwargs.get("hdd_usage_ratio", HDD_USAGE_RATIO),
+            kwargs.get("storage_duration", STORAGE_DURATION),
+        ),
         total_tokens, output_token_count,
     ) * datacenter_pue
     usage_energy = Energy(value=energy)
@@ -124,4 +135,4 @@ def compute_llm_train_data_storage_impacts(
     )
 
 
-__all__ = ["compute_llm_train_data_storage_impacts", "training_tokens", "training_data_volume", "hdd_required_count"]
+__all__ = ["compute_llm_train_data_storage_impacts", "hdd_required_count", "training_data_volume", "training_tokens"]

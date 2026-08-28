@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import os
+from dataclasses import dataclass
+from typing import Callable
 
 from pydantic import BaseModel
 
 from ecologits.electricity_mix_repository import electricity_mixes
 from ecologits.impacts.llm import compute_llm_impacts
-from ecologits.impacts.llm_training import compute_llm_train_impacts
 from ecologits.impacts.llm_data_storage_training import compute_llm_train_data_storage_impacts
-from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Usage
+from ecologits.impacts.llm_training import compute_llm_train_impacts
+from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.log import logger
 from ecologits.model_repository import ParametersMoE, models
 from ecologits.status_messages import ErrorMessage, ModelNotRegisteredError, WarningMessage, ZoneNotRegisteredError
@@ -141,7 +142,8 @@ def llm_impacts(
 
 
 def _lifecycle_impacts(provider: str, model_name: str, output_token_count: int,
-                       electricity_mix_zone: str | None, calculator) -> ImpactsOutput:
+                       electricity_mix_zone: str | None,
+                       calculator: Callable[..., Impacts]) -> ImpactsOutput:
     model = models.find_model(provider=provider, model_name=model_name)
     if model is None:
         error = ModelNotRegisteredError(message=f"Could not find model `{model_name}` for {provider} provider.")
@@ -246,7 +248,9 @@ def _load_lifecycle_provider_data() -> None:
             datacenter_pue=pue_value,
             datacenter_wue=wue_value,
             compute_capacity={k: v for k, v in provider.get("compute_capacity", {}).items() if v is not None},
-            number_of_active_models={k: v for k, v in provider.get("number_of_active_models", {}).items() if v is not None},
+            number_of_active_models={
+                k: v for k, v in provider.get("number_of_active_models", {}).items() if v is not None
+            },
         )
 
 

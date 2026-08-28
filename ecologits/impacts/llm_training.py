@@ -8,7 +8,6 @@ explicit because they are not part of the provider response schema.
 import datetime
 from typing import Any
 
-from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.impacts.constants import (
     FLOPS_PER_GPU,
     FLOPS_PER_WATT,
@@ -27,9 +26,10 @@ from ecologits.impacts.constants import (
     SERVER_EMBODIED_IMPACT_ADPE,
     SERVER_EMBODIED_IMPACT_GWP,
     SERVER_EMBODIED_IMPACT_PE,
-    SERVER_GPUS,
     SERVER_GPU_NETWORK_POWER,
+    SERVER_GPUS,
 )
+from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.utils.range_value import RangeValue, ValueOrRange
 
 SERVER_GPU_COUNT = SERVER_GPUS
@@ -117,7 +117,7 @@ def _allocated(total: ValueOrRange, tokens: ValueOrRange, output_token_count: fl
     return values[0] if values[0] == values[1] else RangeValue(min=values[0], max=values[1])
 
 
-def compute_llm_train_impacts(  # noqa: PLR0917 - calculation API mirrors inference impacts
+def compute_llm_train_impacts(
     publication_date: datetime.datetime,
     compute_capacity: dict[str, float],
     number_of_active_models: dict[str, float],
