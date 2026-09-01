@@ -88,7 +88,7 @@ RangeValue(min=0.16, max=0.48) # in kgCO2eq (1)
 
 ## Impact Criteria
 
-To evaluate the impact of human activities on the planet or on the climate we use criteria that usually focus on a specific issue such as **GHG emissions for global warming**, **water consumption and pollution** or the **depletion of natural resources**. We currently support three environmental impact criteria in addition with the direct energy consumption. 
+To evaluate the impact of human activities on the planet or on the climate we use criteria that usually focus on a specific issue such as **GHG emissions for global warming**, **water consumption and pollution** or the **depletion of natural resources**. We currently support four environmental impact criteria in addition with the direct energy consumption. 
 
 **Monitoring multiple criteria is useful to avoid pollution shifting**, which is defined as the transfer of pollution from one medium to another. It is a common pitfall to optimize only one criterion like GHG emissions (e.g. buying new hardware that is more energy efficient), that can lead to higher impacts on minerals and metals depletion for example (see [encyclopedia.com :octicons-link-external-16:](https://www.encyclopedia.com/environment/educational-magazines/pollution-shifting)).
 
@@ -146,6 +146,20 @@ Learn more: [wikipedia.org :octicons-link-external-16:](https://en.wikipedia.org
 
 ??? note "PE model attributes"
     ::: impacts.modeling.PE
+        options:
+            show_root_toc_entry: false
+            show_bases: false
+            show_docstring_description: false
+            docstring_section_style: list
+
+### Water Consumption Footprint (WCF)
+
+The Water Consumption Footprint ([`WCF`][impacts.modeling.WCF]) criterion represents the **amount of water consumed to generate electricity and to operate data center infrastructures**. This criterion is expressed in **liter (L)**.
+
+Learn more: [wikipedia.org :octicons-link-external-16:](https://en.wikipedia.org/wiki/Water_footprint)
+
+??? note "WCF model attributes"
+    ::: impacts.modeling.WCF
         options:
             show_root_toc_entry: false
             show_bases: false
