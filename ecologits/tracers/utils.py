@@ -232,14 +232,15 @@ PROVIDER_CONFIG_MAP = {
 
 
 def _load_lifecycle_provider_data() -> None:
-    """Merge compute-capacity data from ``data/providers.json`` into ``PROVIDER_CONFIG_MAP``.
+    """Load provider data from ``data/providers.json`` into ``PROVIDER_CONFIG_MAP``.
 
-    ``providers.json`` is the source of truth for the lifecycle fields
-    (``compute_capacity`` and ``number_of_active_models``) and contributes any
-    provider missing from the hardcoded map. The datacenter configuration
-    (location, PUE, WUE) of providers already present above is left untouched so
-    that the inference behavior cannot drift with the data file. The hardcoded
-    map doubles as fallback when the file is absent.
+    ``providers.json`` is the source of truth: for every provider listed in the
+    file, the existing entry is fully replaced, including the datacenter
+    configuration (location, PUE, WUE). Providers already present above are
+    therefore expected to keep values consistent with the file; changes to the
+    file take precedence and drift with inference behavior is caught by the
+    golden-value tests. The hardcoded map contributes providers missing from the
+    file and doubles as fallback when the file is absent.
     """
     filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "data", "providers.json")
     if not os.path.exists(filepath):
