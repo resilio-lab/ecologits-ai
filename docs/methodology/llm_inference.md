@@ -175,12 +175,20 @@ $$
 E_{\text{server}} = E_{\text{server} \backslash \text{GPU}} + \text{GPU} \times E_{\text{GPU}}.
 $$
 
-### Modeling request energy consumption
+### Modeling network energy consumption
 
-To estimate the energy consumption of the request, we multiply the previously computed server energy by the Power Usage Effectiveness (PUE) to account for cooling equipment in the data center:
+The energy consumption of the network equipment (firewall, router, and switch) is estimated with a weighted average power, $W_{\text{network}}$, accounting for the usage ratio of each equipment. The network energy is allocated to the request like the server energy, proportionally to the number of required GPUs and inversely to the batch size:
 
 $$
-E_{\text{request}} = \text{PUE} \times E_{\text{server}}.
+E_{\text{network}}(\Delta T) = \Delta T \times W_{\text{network}} \times \frac{\text{GPU}}{\#\text{GPU}_{\text{installed}}} \times \frac{1}{B}.
+$$
+
+### Modeling request energy consumption
+
+To estimate the energy consumption of the request, we multiply the previously computed IT energy (server and network equipment) by the Power Usage Effectiveness (PUE) to account for cooling equipment in the data center:
+
+$$
+E_{\text{request}} = \text{PUE} \times (E_{\text{server}} + E_{\text{network}}).
 $$
 
 ### Modeling request usage environmental impacts
@@ -219,6 +227,7 @@ The embodied environmental impacts of the cloud instance **(excluding GPUs)** ar
 | GWP (kgCO2eq)   | $5700$               |
 | ADPe (kgSbeq)   | $0.37$               |
 | PE (MJ)         | $70,000$             |
+| WCF (L)         | $1,555,315$          |
 
 ??? info "Embodied impacts of the server (without GPUs)"
 
@@ -244,6 +253,7 @@ We use results from [Lees-Perasso et al. (2026)](https://librairie.ademe.fr/econ
 | GWP (kgCO2eq)  | $273$            |
 | ADPe (kgSbeq)  | $0.00895$        |
 | PE (MJ)        | $3721$           |
+| WCF (L)        | $101,500$        |
 
 #### Complete server embodied impacts
 
@@ -262,7 +272,7 @@ $$
 I^{\text{e}}_{\text{request}}=\frac{\Delta T}{B \times  \Delta L} \times I^{\text{e}}_{\text{server}}.
 $$
 
-!!! warning "Water consumption (WCF) impact is not modeled for the embodied phase due to a lack of data."
+The embodied impacts of the network equipment are allocated to the request the same way, using a network equipment lifetime of 5 years. The Water Consumption Footprint (WCF) is estimated for the server, the GPUs, and the network equipment, and is allocated like the other embodied criteria.
 
 
 ## Supplemental material
@@ -315,7 +325,7 @@ We estimate the **required infrastructure** to run the service in terms of hardw
 **Limitations:**
 
 * We do not account for TPUs or other type of accelerators.
-* We do not account for networking or storage primitives.
+* We do not account for storage primitives.
 * We do not account for infrastructure overheads or utilization factors.
 
 ### On data centers
