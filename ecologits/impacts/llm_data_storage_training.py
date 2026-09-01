@@ -19,11 +19,11 @@ from ecologits.impacts.constants import (
     STORAGE_DURATION,
 )
 from ecologits.impacts.llm_training import (
-    _allocated,
-    _bounds,
+    allocated_per_request,
     inference_compute_capacity_per_model,
     total_output_tokens,
     training_flops,
+    value_bounds,
 )
 from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.utils.range_value import RangeValue, ValueOrRange
@@ -34,8 +34,8 @@ def training_tokens(
     model_active_parameter_count: ValueOrRange,
 ) -> ValueOrRange:
     """Estimate the number of tokens used to train a model."""
-    flops_min, flops_max = _bounds(training_flops_value)
-    params_min, params_max = _bounds(model_active_parameter_count)
+    flops_min, flops_max = value_bounds(training_flops_value)
+    params_min, params_max = value_bounds(model_active_parameter_count)
     values = (flops_min / (6 * params_max * 1e9), flops_max / (6 * params_min * 1e9))
     return values[0] if values[0] == values[1] else RangeValue(min=values[0], max=values[1])
 
@@ -90,7 +90,7 @@ def compute_llm_train_data_storage_impacts(
         )
     )
     hdds = hdd_required_count(train_data, kwargs.get("hdd_volume", HDD_VOLUME))
-    energy = _allocated(
+    energy = allocated_per_request(
         hdd_energy_training(
             hdds,
             kwargs.get("hdd_power", HDD_POWER),
@@ -107,9 +107,8 @@ def compute_llm_train_data_storage_impacts(
     storage_hours = kwargs.get("storage_duration", STORAGE_DURATION)
     lifetime = kwargs.get("hdd_lifetime", HDD_LIFESPAN)
     # storage_duration is in hours while HDD_LIFESPAN is in seconds: convert the
-    # lifetime to hours so the ratio matches the training module's allocation
-    # (PR #1 divided hours by seconds here, understating embodied impacts ~3600x).
-    embodied = _allocated(
+    # lifetime to hours so the ratio matches the training module's allocation.
+    embodied = allocated_per_request(
         hdds * storage_hours / (lifetime / 3600), total_tokens, output_token_count
     )
     embodied_gwp = GWP(value=embodied * kwargs.get("hdd_embodied_gwp", HDD_EMBODIED_IMPACT_GWP))
