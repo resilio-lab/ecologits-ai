@@ -32,7 +32,6 @@ HARDWARE_LIFESPAN = 3 * 365 * 24 * 60 * 60
 
 BATCH_SIZE = 64
 
-# New inference defaults (additive only): network equipment and WCF embodied.
 FIREWALL_POWER = ROUTER_POWER = SWITCH_POWER = 0.09
 FIREWALL_USAGE_RATIO = 0.0358
 ROUTER_USAGE_RATIO = 0.286
