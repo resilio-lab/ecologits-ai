@@ -3,22 +3,11 @@
 import datetime
 from typing import Any
 
-from ecologits.impacts.constants import (
+from ecologits.impacts.llm_training import (
     FLOPS_PER_WATT,
     GPU_UTILIZATION_RATE,
-    HDD_EMBODIED_IMPACT_ADPE,
-    HDD_EMBODIED_IMPACT_GWP,
-    HDD_EMBODIED_IMPACT_PE,
-    HDD_EMBODIED_IMPACT_WCF,
-    HDD_LIFESPAN,
-    HDD_POWER,
-    HDD_USAGE_RATIO,
-    HDD_VOLUME,
     INFERENCE_COMPUTE_SHARE,
     MODEL_LIFESPAN,
-    STORAGE_DURATION,
-)
-from ecologits.impacts.llm_training import (
     allocated_per_request,
     inference_compute_capacity_per_model,
     total_output_tokens,
@@ -27,6 +16,16 @@ from ecologits.impacts.llm_training import (
 )
 from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.utils.range_value import RangeValue, ValueOrRange
+
+STORAGE_DURATION = 100 * 24
+HDD_VOLUME = 30
+HDD_POWER = 0.0095
+HDD_USAGE_RATIO = 0.2
+HDD_EMBODIED_IMPACT_GWP = 640.5
+HDD_EMBODIED_IMPACT_ADPE = 0.0
+HDD_EMBODIED_IMPACT_PE = 0.0
+HDD_EMBODIED_IMPACT_WCF = 163480
+HDD_LIFESPAN = 5 * 365 * 24 * 60 * 60
 
 
 def training_tokens(
@@ -126,4 +125,4 @@ def compute_llm_train_data_storage_impacts(
     )
 
 
-__all__ = ["compute_llm_train_data_storage_impacts", "hdd_required_count", "training_data_volume", "training_tokens"]
+__all__ = ["compute_llm_train_data_storage_impacts"]

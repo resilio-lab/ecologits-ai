@@ -8,17 +8,12 @@ explicit because they are not part of the provider response schema.
 import datetime
 from typing import Any
 
-from ecologits.impacts.constants import (
-    FLOPS_PER_GPU,
-    FLOPS_PER_WATT,
+from ecologits.impacts.llm import (
     GPU_EMBODIED_IMPACT_ADPE,
     GPU_EMBODIED_IMPACT_GWP,
     GPU_EMBODIED_IMPACT_PE,
     GPU_EMBODIED_IMPACT_WCF,
-    GPU_UTILIZATION_RATE,
     HARDWARE_LIFESPAN,
-    INFERENCE_COMPUTE_SHARE,
-    MODEL_LIFESPAN,
     NETWORK_EMBODIED_IMPACT_ADPE,
     NETWORK_EMBODIED_IMPACT_GWP,
     NETWORK_EMBODIED_IMPACT_PE,
@@ -33,6 +28,12 @@ from ecologits.impacts.constants import (
 )
 from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Impacts, Usage
 from ecologits.utils.range_value import RangeValue, ValueOrRange
+
+FLOPS_PER_WATT = 1.4e12
+FLOPS_PER_GPU = 1.979e15
+GPU_UTILIZATION_RATE = 0.7
+INFERENCE_COMPUTE_SHARE = 0.8
+MODEL_LIFESPAN = 2 * 365 * 24 * 60 * 60
 
 
 def value_bounds(value: ValueOrRange) -> tuple[float, float]:
@@ -209,13 +210,4 @@ def compute_llm_train_impacts(
     )
 
 
-__all__ = [
-    "allocated_per_request",
-    "compute_llm_train_impacts",
-    "inference_compute_capacity_per_model",
-    "server_hours_training",
-    "total_output_tokens",
-    "total_training_energy",
-    "training_flops",
-    "value_bounds",
-]
+__all__ = ["compute_llm_train_impacts"]
