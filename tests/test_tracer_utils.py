@@ -1,6 +1,12 @@
 import pytest
 
-from ecologits.tracers.utils import llm_impacts, llm_train_data_storage_impacts, llm_train_impacts
+from ecologits.impacts.modeling import ADPe, GWP, PE, Embodied
+from ecologits.tracers.utils import (
+    PROVIDER_CONFIG_MAP,
+    llm_impacts,
+    llm_train_data_storage_impacts,
+    llm_train_impacts,
+)
 from ecologits.utils.range_value import RangeValue
 
 
@@ -45,3 +51,21 @@ def test_llm_train_data_storage_impacts_golden_values() -> None:
     assert impacts.embodied.gwp is not None
     assert to_float(impacts.energy.value) == pytest.approx(4.1676283022914094e-16)
     assert to_float(impacts.embodied.gwp.value) == pytest.approx(2.673001209262244e-15)
+
+
+def test_provider_loader_preserves_inference_datacenter_config() -> None:
+    openai_config = PROVIDER_CONFIG_MAP["openai"]
+    anthropic_config = PROVIDER_CONFIG_MAP["anthropic"]
+
+    assert openai_config.datacenter_location == "USA"
+    assert openai_config.datacenter_pue == 1.20
+    assert openai_config.datacenter_wue == 0.569
+    assert anthropic_config.datacenter_location == "USA"
+    assert to_float(anthropic_config.datacenter_pue) > 0
+
+
+def test_embodied_defaults_to_zero_wcf() -> None:
+    embodied = Embodied(gwp=GWP(value=0), adpe=ADPe(value=0), pe=PE(value=0))
+
+    assert embodied.wcf is not None
+    assert to_float(embodied.wcf.value) == 0
