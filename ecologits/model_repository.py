@@ -56,6 +56,7 @@ class Model(BaseModel):
         warnings: Warnings linked to the model (e.g. "model-arch-not-released" or "model-arch-multimodal")
         sources: Source of the model information (website link)
         deployment: Deployment information (tps, ttft)
+        publication_date: Publication date of the model, used to allocate training impacts.
     """
 
     provider: Providers

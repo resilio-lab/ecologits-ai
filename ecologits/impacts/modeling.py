@@ -198,6 +198,7 @@ class Embodied(Phase):
         gwp: Global Warming Potential (GWP) embodied impact
         adpe: Abiotic Depletion Potential for Elements (ADPe) embodied impact
         pe: Primary Energy (PE) embodied impact
+        wcf: Water Consumption Footprint (WCF) embodied impact
     """
     type: str = "embodied"
     name: str = "Embodied"
@@ -216,7 +217,7 @@ class Impacts(BaseModel):
         gwp: Total Global Warming Potential (GWP) impact
         adpe: Total Abiotic Depletion Potential for Elements (ADPe) impact
         pe: Total Primary Energy (PE) impact
-        wcf: Usage-only Water Consumption Footprint (WCF) impact
+        wcf: Total Water Consumption Footprint (WCF) impact
         usage: Impacts for the usage phase
         embodied: Impacts for the embodied phase
     """
