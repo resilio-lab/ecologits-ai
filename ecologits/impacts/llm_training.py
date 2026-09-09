@@ -286,6 +286,3 @@ def compute_llm_train_impacts(
         usage=Usage(energy=usage_energy, gwp=usage_gwp, adpe=usage_adpe, pe=usage_pe, wcf=usage_wcf),
         embodied=Embodied(gwp=embodied_gwp, adpe=embodied_adpe, pe=embodied_pe, wcf=embodied_wcf),
     )
-
-
-__all__ = ["compute_llm_train_impacts"]
