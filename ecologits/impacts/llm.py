@@ -187,7 +187,19 @@ def network_energy(
         gpu_required_count: int,
         batch_size: int,
 ) -> float:
-    """Compute network equipment energy allocated to the request."""
+    """
+    Compute network equipment energy allocated to the request.
+
+    Args:
+        generation_latency: Token generation latency in seconds.
+        network_power: Power consumption of the network equipment in kW.
+        server_gpu_count: Number of available GPUs in the server.
+        gpu_required_count: Number of required GPUs to load the model.
+        batch_size: Number of requests handled concurrently by the server.
+
+    Returns:
+        The energy consumption of the network equipment allocated to the request in kWh.
+    """
     return generation_latency / 3600 * network_power * gpu_required_count / server_gpu_count / batch_size
 
 

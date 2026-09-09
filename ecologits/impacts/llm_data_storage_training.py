@@ -32,7 +32,16 @@ def training_tokens(
     training_flops_value: ValueOrRange,
     model_active_parameter_count: ValueOrRange,
 ) -> ValueOrRange:
-    """Estimate the number of tokens used to train a model."""
+    """
+    Estimate the number of tokens used to train a model.
+
+    Args:
+        training_flops_value: Number of floating point operations used for training.
+        model_active_parameter_count: Number of active parameters of the model (in billion).
+
+    Returns:
+        The estimated number of training tokens.
+    """
     flops_min, flops_max = value_bounds(training_flops_value)
     params_min, params_max = value_bounds(model_active_parameter_count)
     values = (flops_min / (6 * params_max * 1e9), flops_max / (6 * params_min * 1e9))
@@ -40,11 +49,29 @@ def training_tokens(
 
 
 def training_data_volume(training_tokens_value: ValueOrRange) -> ValueOrRange:
-    """Estimate training-data volume in TB, assuming four bytes per token."""
+    """
+    Estimate training-data volume in TB.
+
+    Args:
+        training_tokens_value: Number of tokens used to train the model.
+
+    Returns:
+        The training-data volume in TB, assuming four bytes per token.
+    """
     return training_tokens_value * 4 / 1000**4
 
 
 def hdd_required_count(training_data_volume_value: ValueOrRange, hdd_volume: float = HDD_VOLUME) -> ValueOrRange:
+    """
+    Compute the number of required HDDs to store the training data.
+
+    Args:
+        training_data_volume_value: Training-data volume in TB.
+        hdd_volume: Storage capacity of a single HDD in TB.
+
+    Returns:
+        The number of required HDDs.
+    """
     return training_data_volume_value / hdd_volume
 
 
@@ -54,6 +81,18 @@ def hdd_energy_training(
     hdd_usage_ratio: float = HDD_USAGE_RATIO,
     storage_duration: float = STORAGE_DURATION,
 ) -> ValueOrRange:
+    """
+    Compute the energy consumption of the HDDs during storage.
+
+    Args:
+        hdd_count: Number of HDDs used to store the training data.
+        hdd_power: Power consumption of a single HDD in kW.
+        hdd_usage_ratio: Usage ratio of the HDDs.
+        storage_duration: Storage duration in hours.
+
+    Returns:
+        The energy consumption of the HDDs in kWh.
+    """
     return hdd_count * hdd_power * hdd_usage_ratio * storage_duration
 
 
@@ -72,7 +111,26 @@ def compute_llm_train_data_storage_impacts(
     datacenter_wue: ValueOrRange,
     **kwargs: Any,
 ) -> Impacts:
-    """Estimate training-data storage impacts allocated to one request."""
+    """
+    Estimate training-data storage impacts allocated to one request.
+
+    Args:
+        publication_date: Publication date of the model.
+        compute_capacity: Total fleet compute capacity in GW per year.
+        number_of_active_models: Number of active models sharing the capacity per year.
+        model_active_parameter_count: Number of active parameters of the model (in billion).
+        model_total_parameter_count: Number of total parameters of the model (in billion).
+        output_token_count: Number of generated tokens.
+        if_electricity_mix_adpe: ADPe impact factor of electricity consumption in kgSbeq / kWh.
+        if_electricity_mix_pe: PE impact factor of electricity consumption in MJ / kWh.
+        if_electricity_mix_gwp: GWP impact factor of electricity consumption in kgCO2eq / kWh.
+        if_electricity_mix_wue: WUE impact factor of electricity consumption in L / kWh.
+        datacenter_pue: Power Usage Effectiveness of the data center.
+        datacenter_wue: Water Usage Effectiveness of the data center.
+
+    Returns:
+        The training-data storage environmental impacts allocated to the request.
+    """
     capacity = inference_compute_capacity_per_model(
         publication_date, compute_capacity, number_of_active_models,
         kwargs.get("inference_compute_share", INFERENCE_COMPUTE_SHARE),
