@@ -650,7 +650,7 @@ wheels = [
 
 [[package]]
 name = "ecologits"
-version = "0.10.2"
+version = "0.11.1"
 source = { editable = "." }
 dependencies = [
     { name = "packaging" },
@@ -704,6 +704,7 @@ dev = [
     { name = "pytest-recording" },
     { name = "setuptools" },
     { name = "toml" },
+    { name = "vcrpy" },
 ]
 docs = [
     { name = "mike" },
@@ -729,7 +730,7 @@ requires-dist = [
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.32.1,<2.0.0" },
     { name = "opentelemetry-exporter-otlp", marker = "extra == 'opentelemetry'", specifier = ">=1.32.1,<2.0.0" },
     { name = "opentelemetry-sdk", marker = "extra == 'opentelemetry'", specifier = ">=1.32.1,<2.0.0" },
-    { name = "packaging", specifier = ">=24.2,<25.0" },
+    { name = "packaging", specifier = ">=24.2" },
     { name = "pydantic", specifier = ">=1.9.0,<3" },
     { name = "rapidfuzz", marker = "extra == 'litellm'", specifier = ">=3.12.1,<4.0.0" },
     { name = "tiktoken", marker = "extra == 'huggingface-hub'", specifier = ">=0.8.0,<0.13.0" },
@@ -750,6 +751,7 @@ dev = [
     { name = "pytest-recording", specifier = ">=0.13.1" },
     { name = "setuptools", specifier = ">=80.9.0" },
     { name = "toml", specifier = ">=0.10.2" },
+    { name = "vcrpy", specifier = ">=8.2.1" },
 ]
 docs = [
     { name = "mike", specifier = ">=2.1.2" },
