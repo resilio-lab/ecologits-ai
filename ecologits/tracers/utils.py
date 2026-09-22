@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
 
 from pydantic import BaseModel
 
 from ecologits.electricity_mix_repository import electricity_mixes
 from ecologits.impacts.llm import compute_llm_impacts
+from ecologits.impacts.llm_data_storage_training import compute_llm_train_data_storage_impacts
+from ecologits.impacts.llm_training import compute_llm_train_impacts
 from ecologits.impacts.modeling import GWP, PE, WCF, ADPe, Embodied, Energy, Usage
 from ecologits.log import logger
 from ecologits.model_repository import ParametersMoE, models
@@ -22,7 +26,7 @@ class ImpactsOutput(BaseModel):
         gwp: Total Global Warming Potential (GWP) impact
         adpe: Total Abiotic Depletion Potential for Elements (ADPe) impact
         pe: Total Primary Energy (PE) impact
-        wcf: Usage-only Water Consumption Footprint (WCF) impact
+        wcf: Total Water Consumption Footprint (WCF) impact
         usage: Impacts for the usage phase
         embodied: Impacts for the embodied phase
         warnings: List of warnings
@@ -136,11 +140,117 @@ def llm_impacts(
     return impacts
 
 
+def llm_train_impacts(provider: str, model_name: str, output_token_count: int,
+                      electricity_mix_zone: str | None = None) -> ImpactsOutput:
+    """
+    Compute per-request training impacts allocated by output tokens.
+
+    Args:
+        provider: Name of the provider.
+        model_name: Name of the LLM used.
+        output_token_count: Number of generated tokens.
+        electricity_mix_zone: ISO 3166-1 alpha-3 code of the electricity mix zone.
+
+    Returns:
+        The training impacts allocated to the request.
+    """
+    model = models.find_model(provider=provider, model_name=model_name)
+    if model is None:
+        error: ErrorMessage = ModelNotRegisteredError(
+            message=f"Could not find model `{model_name}` for {provider} provider."
+        )
+        logger.warning_once(str(error))
+        return ImpactsOutput(errors=[error])
+    config = PROVIDER_CONFIG_MAP[provider]
+    zone = electricity_mix_zone or config.datacenter_location or "WOR"
+    mix = electricity_mixes.find_electricity_mix(zone=zone)
+    if mix is None:
+        error = ZoneNotRegisteredError(message=f"Could not find electricity mix for `{zone}` zone.")
+        logger.warning_once(str(error))
+        return ImpactsOutput(errors=[error])
+    parameters = model.architecture.parameters
+    total = parameters.total if isinstance(parameters, ParametersMoE) else parameters
+    active = parameters.active if isinstance(parameters, ParametersMoE) else parameters
+    impacts = compute_llm_train_impacts(
+        publication_date=model.publication_date,
+        compute_capacity=config.compute_capacity or {},
+        number_of_active_models=config.number_of_active_models or {},
+        model_active_parameter_count=active,
+        model_total_parameter_count=total,
+        output_token_count=output_token_count,
+        if_electricity_mix_adpe=mix.adpe,
+        if_electricity_mix_pe=mix.pe,
+        if_electricity_mix_gwp=mix.gwp,
+        if_electricity_mix_wue=mix.wue,
+        datacenter_pue=config.datacenter_pue,
+        datacenter_wue=config.datacenter_wue,
+    )
+    output = ImpactsOutput.model_validate(impacts.model_dump())
+    for warning in model.warnings + mix.warnings:
+        logger.warning_once(str(warning))
+        output.add_warning(warning)
+    return output
+
+
+def llm_train_data_storage_impacts(provider: str, model_name: str, output_token_count: int,
+                                   electricity_mix_zone: str | None = None) -> ImpactsOutput:
+    """
+    Compute per-request training-data storage impacts allocated by output tokens.
+
+    Args:
+        provider: Name of the provider.
+        model_name: Name of the LLM used.
+        output_token_count: Number of generated tokens.
+        electricity_mix_zone: ISO 3166-1 alpha-3 code of the electricity mix zone.
+
+    Returns:
+        The training-data storage impacts allocated to the request.
+    """
+    model = models.find_model(provider=provider, model_name=model_name)
+    if model is None:
+        error = ModelNotRegisteredError(
+            message=f"Could not find model `{model_name}` for {provider} provider."
+        )
+        logger.warning_once(str(error))
+        return ImpactsOutput(errors=[error])
+    config = PROVIDER_CONFIG_MAP[provider]
+    zone = electricity_mix_zone or config.datacenter_location or "WOR"
+    mix = electricity_mixes.find_electricity_mix(zone=zone)
+    if mix is None:
+        error = ZoneNotRegisteredError(message=f"Could not find electricity mix for `{zone}` zone.")
+        logger.warning_once(str(error))
+        return ImpactsOutput(errors=[error])
+    parameters = model.architecture.parameters
+    total = parameters.total if isinstance(parameters, ParametersMoE) else parameters
+    active = parameters.active if isinstance(parameters, ParametersMoE) else parameters
+    impacts = compute_llm_train_data_storage_impacts(
+        publication_date=model.publication_date,
+        compute_capacity=config.compute_capacity or {},
+        number_of_active_models=config.number_of_active_models or {},
+        model_active_parameter_count=active,
+        model_total_parameter_count=total,
+        output_token_count=output_token_count,
+        if_electricity_mix_adpe=mix.adpe,
+        if_electricity_mix_pe=mix.pe,
+        if_electricity_mix_gwp=mix.gwp,
+        if_electricity_mix_wue=mix.wue,
+        datacenter_pue=config.datacenter_pue,
+        datacenter_wue=config.datacenter_wue,
+    )
+    output = ImpactsOutput.model_validate(impacts.model_dump())
+    for warning in model.warnings + mix.warnings:
+        logger.warning_once(str(warning))
+        output.add_warning(warning)
+    return output
+
+
 @dataclass
 class _ProviderConfig:
     datacenter_location: str
     datacenter_pue: float | RangeValue
     datacenter_wue: float | RangeValue
+    compute_capacity: dict[str, float] | None = None
+    number_of_active_models: dict[str, float] | None = None
 
 
 PROVIDER_CONFIG_MAP = {
@@ -175,3 +285,34 @@ PROVIDER_CONFIG_MAP = {
         datacenter_wue=0.569,
     )
 }
+
+
+def _load_lifecycle_provider_data() -> None:
+    """Load lifecycle-only provider data from ``data/providers.json``.
+
+    The hardcoded ``PROVIDER_CONFIG_MAP`` remains the source of truth for
+    inference (datacenter location, PUE, WUE) so existing ``llm_impacts()``
+    results are unchanged. This loader only fills the lifecycle fields
+    (``compute_capacity``, ``number_of_active_models``) used by the new
+    training and storage estimators. The file doubles as fallback-safe:
+    missing file or missing provider leaves the hardcoded map untouched.
+    """
+    filepath = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "data", "providers.json")
+    if not os.path.exists(filepath):
+        return
+    with open(filepath) as fd:
+        data = json.load(fd)
+    for provider in data.get("providers", []):
+        name = provider.get("name")
+        if name not in PROVIDER_CONFIG_MAP:
+            continue
+        config = PROVIDER_CONFIG_MAP[name]
+        config.compute_capacity = {
+            k: v for k, v in provider.get("compute_capacity", {}).items() if v is not None
+        } or None
+        config.number_of_active_models = {
+            k: v for k, v in provider.get("number_of_active_models", {}).items() if v is not None
+        } or None
+
+
+_load_lifecycle_provider_data()
